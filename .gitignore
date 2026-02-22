@@ -1,0 +1,16 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+data/
+# Model checkpoints (optional — keep if too large)
+*.pth
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Results folder (optional)
+results/images/*
+results/tables/*
