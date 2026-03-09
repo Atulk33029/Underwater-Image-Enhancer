@@ -124,3 +124,5 @@ watchdog==4.0.1
 wcwidth==0.2.13
 Werkzeug==3.0.3
 wsproto==1.2.0
+matplotlib
+streamlit-image-comparison
