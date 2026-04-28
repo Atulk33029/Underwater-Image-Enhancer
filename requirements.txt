@@ -1,11 +1,9 @@
-streamlit
-numpy
-pillow
-matplotlib
-opencv-python-headless
-streamlit-image-comparison
+streamlit==1.33.0
+numpy==1.26.4
+pillow==10.3.0
+matplotlib==3.8.4
+opencv-python-headless==4.9.0.80
+streamlit-image-comparison==0.0.4
 
-# Torch CPU (lightweight, required for Streamlit Cloud)
-torch==2.0.0+cpu
-torchvision==0.15.1+cpu
---extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.1.2
+torchvision==0.16.2
