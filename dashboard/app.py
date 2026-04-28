@@ -42,22 +42,45 @@ def load_model():
 model, device = load_model()
 
 
-# ---------------- UI ---------------- #
-st.title("🌊 Underwater Image Enhancement System")
-
+# ---------------- UI HEADER ---------------- #
 st.markdown("""
-Enhance underwater images using a **U-Net deep learning model**
-trained on the **EUVP dataset**.
-""")
+<style>
+.main-title {
+    font-size: 32px;
+    font-weight: bold;
+    color: #00bcd4;
+}
+.subtitle {
+    font-size: 16px;
+    color: #aaa;
+}
+.metric-box {
+    padding: 10px;
+    border-radius: 10px;
+    background-color: #111;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<p class="main-title">🌊 Underwater Image Enhancement System</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Enhance underwater images using deep learning (U-Net)</p>', unsafe_allow_html=True)
 
 
-uploaded_file = st.file_uploader(
-    "Upload an underwater image",
-    type=["jpg", "jpeg", "png"]
-)
+# ---------------- SIDEBAR ---------------- #
+st.sidebar.header("⚙️ Controls")
+
+show_graph = st.sidebar.checkbox("Show Graph", True)
+show_metrics = st.sidebar.checkbox("Show Metrics", True)
+image_size = st.sidebar.slider("Resize Image", 128, 512, 256)
+
+st.sidebar.markdown("---")
+st.sidebar.info("Model: U-Net\nDataset: EUVP\nMetric: UIQM")
 
 
-# ---------------- Processing ---------------- #
+# ---------------- FILE UPLOAD ---------------- #
+uploaded_file = st.file_uploader("📤 Upload Image", type=["jpg", "jpeg", "png"])
+
+
 if uploaded_file is not None:
 
     # Read image
@@ -65,100 +88,124 @@ if uploaded_file is not None:
     image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    # ---------------- Preprocess ---------------- #
-    img_resized = cv2.resize(image_rgb, (256, 256)) / 255.0
+    # Resize BOTH images (important fix)
+    image_resized = cv2.resize(image_rgb, (image_size, image_size)) / 255.0
 
-    tensor = torch.tensor(img_resized)\
+    tensor = torch.tensor(image_resized)\
         .permute(2, 0, 1)\
         .unsqueeze(0)\
         .float()\
         .to(device)
 
-    # ---------------- Inference ---------------- #
-    with st.spinner("Enhancing image..."):
+    # ---------------- INFERENCE ---------------- #
+    with st.spinner("🚀 Enhancing image..."):
         with torch.no_grad():
             output = model(tensor)
 
-    # ---------------- Postprocess ---------------- #
     output = output.squeeze(0).permute(1, 2, 0).cpu().numpy()
     output = np.clip(output, 0, 1)
     output = (output * 255).astype(np.uint8)
 
+    original_display = cv2.resize(image_rgb, (image_size, image_size))
 
-    # ---------------- Before vs After Slider ---------------- #
-    st.subheader("🔍 Before vs After Comparison")
+    # ---------------- TABS ---------------- #
+    tab1, tab2, tab3 = st.tabs(["🔍 Comparison", "📊 Metrics", "📄 Details"])
 
-    original_pil = Image.fromarray(image_rgb)
-    enhanced_pil = Image.fromarray(output)
+    # ================= TAB 1 ================= #
+    with tab1:
+        st.subheader("Before vs After")
 
-    image_comparison(
-        img1=original_pil,
-        img2=enhanced_pil,
-        label1="Original",
-        label2="Enhanced"
-    )
-
-
-    # ---------------- Download Button ---------------- #
-    result_bgr = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
-    _, buffer = cv2.imencode(".png", result_bgr)
-
-    st.download_button(
-        label="⬇️ Download Enhanced Image",
-        data=buffer.tobytes(),
-        file_name="enhanced_image.png",
-        mime="image/png"
-    )
-
-
-    # ---------------- UIQM Metrics ---------------- #
-    original_uiqm = compute_uiqm(image_rgb)
-    enhanced_uiqm = compute_uiqm(output)
-    improvement = enhanced_uiqm - original_uiqm
-
-    st.subheader("📊 Image Quality Analysis")
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Original UIQM", f"{original_uiqm:.2f}")
-    col2.metric("Enhanced UIQM", f"{enhanced_uiqm:.2f}")
-    col3.metric("Improvement", f"{improvement:.2f}")
-
-
-    # ---------------- Graph ---------------- #
-    st.subheader("📈 Quality Comparison")
-
-    fig, ax = plt.subplots(figsize=(6,4))
-
-    labels = ["Original", "Enhanced"]
-    values = [original_uiqm, enhanced_uiqm]
-    colors = ["#ff6b6b", "#00b894"]
-
-    bars = ax.bar(labels, values, color=colors, width=0.5)
-
-    ax.set_ylabel("UIQM Score")
-    ax.set_title("Underwater Image Quality Improvement")
-    ax.grid(axis="y", linestyle="--", alpha=0.4)
-
-    # Value labels
-    for bar in bars:
-        height = bar.get_height()
-        ax.text(
-            bar.get_x() + bar.get_width()/2,
-            height,
-            f"{height:.2f}",
-            ha="center",
-            va="bottom"
+        image_comparison(
+            img1=Image.fromarray(original_display),
+            img2=Image.fromarray(output),
+            label1="Original",
+            label2="Enhanced",
+            width=700
         )
 
-    st.pyplot(fig)
+        # Side-by-side view (extra premium)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(original_display, caption="Original", use_column_width=True)
+        with col2:
+            st.image(output, caption="Enhanced", use_column_width=True)
+
+        # Download
+        result_bgr = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
+        _, buffer = cv2.imencode(".png", result_bgr)
+
+        st.download_button(
+            "⬇️ Download Enhanced Image",
+            buffer.tobytes(),
+            file_name="enhanced.png"
+        )
 
 
-# ---------------- Footer ---------------- #
+    # ================= TAB 2 ================= #
+    with tab2:
+
+        if show_metrics:
+            original_uiqm = compute_uiqm(original_display)
+            enhanced_uiqm = compute_uiqm(output)
+            improvement = enhanced_uiqm - original_uiqm
+
+            st.subheader("📊 Image Quality")
+
+            col1, col2, col3 = st.columns(3)
+
+            col1.metric("Original", f"{original_uiqm:.2f}")
+            col2.metric("Enhanced", f"{enhanced_uiqm:.2f}")
+            col3.metric("Improvement", f"{improvement:.2f}")
+
+            # Status message
+            if improvement > 0:
+                st.success("✅ Image quality improved")
+            else:
+                st.warning("⚠️ No significant improvement")
+
+
+        # Graph
+        if show_graph:
+            st.subheader("📈 Quality Comparison")
+
+            fig, ax = plt.subplots(figsize=(6,4))
+
+            labels = ["Original", "Enhanced"]
+            values = [original_uiqm, enhanced_uiqm]
+
+            bars = ax.bar(labels, values, color=["#ff6b6b", "#00b894"])
+
+            ax.set_title("UIQM Comparison")
+            ax.grid(axis="y", linestyle="--", alpha=0.3)
+
+            for bar in bars:
+                ax.text(bar.get_x()+bar.get_width()/2,
+                        bar.get_height(),
+                        f"{bar.get_height():.2f}",
+                        ha="center")
+
+            st.pyplot(fig)
+
+
+    # ================= TAB 3 ================= #
+    with tab3:
+
+        st.subheader("🧠 Enhancement Details")
+
+        st.markdown(f"""
+        - **Model Used:** U-Net  
+        - **Input Resolution:** {image_rgb.shape[1]} × {image_rgb.shape[0]}  
+        - **Processing Device:** {device}  
+        """)
+
+        st.markdown("### 📌 Interpretation")
+
+        if improvement > 0:
+            st.info("Enhanced image has better contrast and visibility.")
+        else:
+            st.info("Model struggled due to complex lighting conditions.")
+
+
+# ---------------- FOOTER ---------------- #
 st.markdown("---")
-
-st.markdown("""
-**Model:** U-Net  
-**Dataset:** EUVP  
-**Metric:** UIQM  
-""")
+st.markdown("Built with using PyTorch & Streamlit")
